@@ -9,15 +9,15 @@ import {
   EKUBO_BOUND,
   EKUBO_FEES_MULTIPLICATOR,
   EKUBO_TICK_SPACING,
-  ETH_ADDRESS,
   FACTORY_ADDRESS,
   LIQUIDITY_LOCK_FOREVER_TIMESTAMP,
+  QUOTE_TOKENS,
   Selector,
   STARKNET_MAX_BLOCK_TIME,
 } from '../utils/constants'
 import { getStartingTick } from '../utils/ekubo'
 import { decimalsScale, parsePercentage } from '../utils/helpers'
-import { getEtherPrice } from '../utils/price'
+import { getQuoteTokenPrice } from '../utils/price'
 import { getMemecoin } from './memecoinData'
 
 type LaunchFormData = { [K in keyof LaunchForm]: NonNullable<LaunchForm[K]> }
@@ -29,9 +29,18 @@ export async function launchOnEkubo(adapter: BaseAdapter, account: string, data:
       error: 'Memecoin not found',
     }
   }
+  if (memecoin.isLaunched) {
+    return {
+      error: 'Memecoin is already launched',
+    }
+  }
 
-  const quoteTokenPrice = await getEtherPrice()
-  const quoteTokenAddress = ETH_ADDRESS
+  const quoteTokenPrice = await getQuoteTokenPrice(data.quoteToken)
+  if (!quoteTokenPrice) {
+    return {
+      error: 'Quote token price could not be fetched',
+    }
+  }
 
   const teamAllocationFraction = data.teamAllocations.reduce((acc, { amount }) => acc.add(amount), new Fraction(0))
   const teamAllocationPercentage = new Percent(
@@ -72,7 +81,7 @@ export async function launchOnEkubo(adapter: BaseAdapter, account: string, data:
     data.address, // memecoin address
     data.antiBotPeriod * 60, // anti bot period in seconds
     data.holdLimit * 100, // hold limit
-    quoteTokenAddress, // quote token address
+    data.quoteToken, // quote token address
     initialHolders, // initial holders
     initialHoldersAmounts, // initial holders amounts
     fees, // ekubo fees
@@ -86,7 +95,7 @@ export async function launchOnEkubo(adapter: BaseAdapter, account: string, data:
     executionRequest: {
       calls: [
         {
-          contractAddress: quoteTokenAddress,
+          contractAddress: data.quoteToken,
           entrypoint: Selector.TRANSFER,
           calldata: transferCalldata,
         },
@@ -109,9 +118,19 @@ export async function launchOnStandardAMM(adapter: BaseAdapter, account: string,
       error: 'Memecoin not found',
     }
   }
+  if (memecoin.isLaunched) {
+    return {
+      error: 'Memecoin is already launched',
+    }
+  }
 
-  const quoteTokenPrice = await getEtherPrice()
-  const quoteTokenAddress = ETH_ADDRESS
+  const quoteToken = QUOTE_TOKENS[data.quoteToken]
+  const quoteTokenPrice = await getQuoteTokenPrice(data.quoteToken)
+  if (!quoteTokenPrice) {
+    return {
+      error: 'Quote token price could not be fetched',
+    }
+  }
 
   const teamAllocationFraction = data.teamAllocations.reduce((acc, { amount }) => acc.add(amount), new Fraction(0))
   const teamAllocationPercentage = new Percent(
@@ -122,7 +141,9 @@ export async function launchOnStandardAMM(adapter: BaseAdapter, account: string,
   const quoteAmount = new Fraction(data.startingMarketCap)
     .divide(quoteTokenPrice)
     .multiply(new Fraction(1).subtract(teamAllocationPercentage))
-  const uin256QuoteAmount = uint256.bnToUint256(BigInt(quoteAmount.multiply(decimalsScale(18)).quotient.toString()))
+  const uin256QuoteAmount = uint256.bnToUint256(
+    BigInt(quoteAmount.multiply(decimalsScale(quoteToken.decimals)).quotient.toString()),
+  )
 
   const initialHolders = data.teamAllocations.map(({ address }) => address)
   const initialHoldersAmounts = data.teamAllocations.map(({ amount }) =>
@@ -145,7 +166,7 @@ export async function launchOnStandardAMM(adapter: BaseAdapter, account: string,
     data.address, // memecoin address
     data.antiBotPeriod * 60, // anti bot period in seconds
     data.holdLimit * 100, // hodl limit
-    quoteTokenAddress, // quote token
+    data.quoteToken, // quote token
     initialHolders, // initial holders
     initialHoldersAmounts, // intial holders amounts
     uin256QuoteAmount, // quote amount
@@ -159,7 +180,7 @@ export async function launchOnStandardAMM(adapter: BaseAdapter, account: string,
     executionRequest: {
       calls: [
         {
-          contractAddress: quoteTokenAddress,
+          contractAddress: data.quoteToken,
           entrypoint: Selector.APPROVE,
           calldata: approveCalldata,
         },

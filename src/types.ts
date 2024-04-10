@@ -47,6 +47,20 @@ interface BaseLiquidity {
   quoteToken: string
 }
 
+export interface USDCPair {
+  address: string
+  reversed: boolean
+}
+
+export interface Token {
+  address: string
+  symbol: string
+  name: string
+  decimals: number
+  camelCased: boolean
+  usdcPair?: USDCPair
+}
+
 export interface JediswapMemecoin extends BaseLaunchedMemecoin {
   liquidity: {
     type: LiquidityType.JEDISWAP_ERC20 | LiquidityType.STARKDEFI_ERC20

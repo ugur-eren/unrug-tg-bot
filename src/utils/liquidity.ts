@@ -5,7 +5,7 @@ import { EkuboMemecoin, JediswapMemecoin, LaunchedMemecoin, LiquidityType } from
 import { DECIMALS, LIQUIDITY_LOCK_FOREVER_TIMESTAMP, QUOTE_TOKENS, Selector } from './constants'
 import { getInitialPrice } from './ekubo'
 import { decimalsScale } from './helpers'
-import { getEtherPrice } from './price'
+import { getQuoteTokenPrice } from './price'
 
 export async function getJediswapLiquidityLockPosition(
   liquidity: Pick<JediswapMemecoin['liquidity'], 'lockPosition' | 'lockManager'>,
@@ -62,10 +62,16 @@ export async function getEkuboLiquidityLockPosition(
 export async function parseLiquidityParams(memecoin: LaunchedMemecoin) {
   // quote token
   const quoteTokenInfos = QUOTE_TOKENS[memecoin.liquidity.quoteToken]
-  const isQuoteTokenSafe = !!quoteTokenInfos
+  let isQuoteTokenSafe = !!quoteTokenInfos
+
+  // quote token price at launch
+  let quoteTokenPriceAtLaunch = await getQuoteTokenPrice(quoteTokenInfos.address, memecoin.launch.blockNumber)
+  if (!quoteTokenPriceAtLaunch) {
+    isQuoteTokenSafe = false
+    quoteTokenPriceAtLaunch = new Fraction(1, 1)
+  }
 
   // starting mcap
-  const ethPriceAtLaunch = await getEtherPrice(memecoin.launch.blockNumber)
   let startingMcap: Fraction | undefined
 
   switch (memecoin.liquidity.type) {
@@ -74,8 +80,8 @@ export async function parseLiquidityParams(memecoin: LaunchedMemecoin) {
       startingMcap = isQuoteTokenSafe
         ? new Fraction(memecoin.liquidity.quoteAmount)
             .multiply(new Fraction(memecoin.launch.teamAllocation, memecoin.totalSupply).add(1))
-            .divide(decimalsScale(DECIMALS))
-            .multiply(ethPriceAtLaunch)
+            .divide(decimalsScale(quoteTokenInfos.decimals))
+            .multiply(quoteTokenPriceAtLaunch)
         : undefined
 
       break
@@ -84,8 +90,11 @@ export async function parseLiquidityParams(memecoin: LaunchedMemecoin) {
     case LiquidityType.EKUBO_NFT: {
       const initialPrice = getInitialPrice(memecoin.liquidity.startingTick)
       startingMcap = isQuoteTokenSafe
-        ? new Fraction(Math.round(initialPrice * +decimalsScale(DECIMALS)), decimalsScale(DECIMALS))
-            .multiply(ethPriceAtLaunch)
+        ? new Fraction(
+            initialPrice.toFixed(DECIMALS).replace(/\./, '').replace(/^0+/, ''), // from 0.000[...]0001 to "1"
+            decimalsScale(DECIMALS),
+          )
+            .multiply(quoteTokenPriceAtLaunch)
             .multiply(memecoin.totalSupply)
             .divide(decimalsScale(DECIMALS))
         : undefined

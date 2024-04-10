@@ -1,15 +1,16 @@
 import { Fraction, Percent } from '@uniswap/sdk-core'
-import { BlockNumber, BlockTag, uint256 } from 'starknet'
+import { BlockNumber, BlockTag, getChecksumAddress, uint256 } from 'starknet'
 
 import { provider } from '../services/provider'
-import { JEDISWAP_ETH_USDC, Selector } from './constants'
+import { USDCPair } from '../types'
+import { QUOTE_TOKENS, Selector } from './constants'
 import { decimalsScale } from './helpers'
 
-export async function getEtherPrice(blockIdentifier: BlockNumber = BlockTag.latest) {
+export async function getPairPrice(pair: USDCPair, blockIdentifier: BlockNumber = BlockTag.latest) {
   return provider
     .callContract(
       {
-        contractAddress: JEDISWAP_ETH_USDC,
+        contractAddress: pair.address,
         entrypoint: Selector.GET_RESERVES,
         calldata: [],
       },
@@ -19,10 +20,21 @@ export async function getEtherPrice(blockIdentifier: BlockNumber = BlockTag.late
       const reserve0 = { low: res.result[0], high: res.result[1] }
       const reserve1 = { low: res.result[2], high: res.result[3] }
 
-      return new Fraction(uint256.uint256ToBN(reserve1).toString(), uint256.uint256ToBN(reserve0).toString()).multiply(
-        decimalsScale(12),
-      )
+      const pairPrice = new Fraction(uint256.uint256ToBN(reserve1).toString(), uint256.uint256ToBN(reserve0).toString())
+
+      return (pair.reversed ? pairPrice.invert() : pairPrice).multiply(decimalsScale(12))
     })
+}
+
+export async function getQuoteTokenPrice(quoteTokenAddress: string, blockIdentifier: BlockNumber = BlockTag.latest) {
+  const quoteToken = QUOTE_TOKENS[getChecksumAddress(quoteTokenAddress)]
+  if (!quoteToken) return
+
+  if (quoteToken.usdcPair) {
+    return getPairPrice(quoteToken.usdcPair, blockIdentifier)
+  }
+
+  return new Fraction(1, 1)
 }
 
 interface ParseCurrencyAmountOptions {

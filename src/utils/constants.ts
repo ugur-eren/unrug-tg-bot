@@ -1,12 +1,18 @@
 import { getChecksumAddress } from 'starknet'
 
+import { Token } from '../types'
 import { getStartingTick } from './ekubo'
 
 export const MULTICALL_ADDRESS = '0x01a33330996310a1e3fa1df5b16c1e07f0491fdd20c441126e02613b948f0225'
 export const TOKEN_CLASS_HASH = '0x063ee878d3559583ceae80372c6088140e1180d9893aa65fbefc81f45ddaaa17'
 export const FACTORY_ADDRESS = '0x01a46467a9246f45c8c340f1f155266a26a71c07bd55d36e8d1c7d0d438a2dbc'
-export const JEDISWAP_ETH_USDC = '0x04d0390b777b424e43839cd1e744799f3de6c176c7e32c1812a41dbd9c19db6a'
+
 export const ETH_ADDRESS = '0x49d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7'
+export const STRK_ADDRESS = '0x4718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d'
+export const USDC_ADDRESS = '0x53c91253bc9682c04929ca02ed00b3e423f6710d2ee7e0d5ebb06f3ecf368a8'
+
+export const JEDISWAP_ETH_USDC = '0x04d0390b777b424e43839cd1e744799f3de6c176c7e32c1812a41dbd9c19db6a'
+export const JEDISWAP_STRK_USDC = '0x5726725e9507c3586cc0516449e2c74d9b201ab2747752bb0251aaa263c9a26'
 
 export enum Selector {
   CREATE_MEMECOIN = 'create_memecoin',
@@ -41,15 +47,42 @@ export const LIQUIDITY_LOCK_FOREVER_TIMESTAMP = 9999999999 // 20/11/2286
 
 export const STARKNET_MAX_BLOCK_TIME = 3600 * 2 // 2h
 
-const Ether = {
+export const Ether: Token = {
   address: ETH_ADDRESS,
   symbol: 'ETH',
+  name: 'Ether',
   decimals: 18,
+  camelCased: true,
+  usdcPair: {
+    address: JEDISWAP_ETH_USDC,
+    reversed: false,
+  },
+}
+
+export const Stark: Token = {
+  address: STRK_ADDRESS,
+  symbol: 'STRK',
+  name: 'Stark',
+  decimals: 18,
+  camelCased: true,
+  usdcPair: {
+    address: JEDISWAP_STRK_USDC,
+    reversed: false,
+  },
+}
+
+export const USDCoin: Token = {
+  address: USDC_ADDRESS,
+  symbol: 'USDC',
+  name: 'USD Coin',
+  decimals: 6,
   camelCased: true,
 }
 
 export const QUOTE_TOKENS = {
   [getChecksumAddress(ETH_ADDRESS)]: Ether,
+  [getChecksumAddress(STRK_ADDRESS)]: Stark,
+  [getChecksumAddress(USDC_ADDRESS)]: USDCoin,
 }
 
 export const DECIMALS = 18

@@ -5,7 +5,7 @@ import { getMemecoin } from '../actions/memecoinData'
 import { Adapters } from '../adapters'
 import { bot } from '../services/bot'
 import { useWallet } from '../services/wallet'
-import { AMMs, DECIMALS } from '../utils/constants'
+import { AMMs, DECIMALS, QUOTE_TOKENS } from '../utils/constants'
 import { createForm, defineField, Forms } from '../utils/form'
 import { decimalsScale } from '../utils/helpers'
 import { LaunchValidation } from '../utils/validation'
@@ -240,6 +240,24 @@ export const createLaunchForm = (chatId: number) => {
       validation: LaunchValidation.lockLiquidty,
       handler: ({ value }) => {
         form.setValue('lockLiquidity', value === 'forever' ? Infinity : Number(value))
+        form.setActiveField('quoteToken')
+      },
+    }),
+    quoteToken: defineField({
+      type: 'choice',
+      value: undefined as string | undefined,
+      message: `Please choose the quote token for the liquidity.`,
+      choices: Object.keys(QUOTE_TOKENS).map((key) => ({
+        key,
+        title: QUOTE_TOKENS[key].symbol,
+      })),
+      handler: ({ value }) => {
+        if (!Object.keys(QUOTE_TOKENS).includes(value)) {
+          bot.sendMessage(chatId, 'Invalid quote token selected. Please choose a valid quote token.')
+          return
+        }
+
+        form.setValue('quoteToken', value)
         form.setActiveField('launch')
       },
     }),
@@ -314,7 +332,8 @@ export const createLaunchForm = (chatId: number) => {
           else result = await launchOnStandardAMM(adapter, accounts[0], data as any)
 
           if ('error' in result) {
-            bot.sendMessage(chatId, `There was an error deploying the memecoin. Please try again.`)
+            await bot.sendMessage(chatId, `There was an error deploying the memecoin. Please try again.`)
+            if (typeof result.error === 'string') await bot.sendMessage(chatId, `Error: ${result.error}`)
             return
           }
 
